@@ -16,6 +16,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
 
   bool _modoEscuro = false;
   bool _carregando = true;
+  String? _ultimoAcesso;
 
   @override
   void initState() {
@@ -32,12 +33,16 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
   Future<void> _carregarPreferencias() async {
     final nome = await _service.obterNomeUsuario();
     final modoEscuro = await _service.obterModoEscuro();
+    final ultimoAcesso = await _service.obterUltimoAcesso();
+
+    await _service.registrarAcesso();
 
     if (!mounted) return;
 
     setState(() {
       _nomeController.text = nome;
       _modoEscuro = modoEscuro;
+      _ultimoAcesso = ultimoAcesso;
       _carregando = false;
     });
   }
@@ -53,6 +58,16 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
         const SnackBar(content: Text('Preferências salvas com sucesso!')),
       );
     }
+  }
+
+  String _formatarData(String bruto) {
+    final data = DateTime.tryParse(bruto);
+    if (data == null) return bruto;
+
+    String doisDigitos(int valor) => valor.toString().padLeft(2, '0');
+
+    return '${doisDigitos(data.day)}/${doisDigitos(data.month)}/${data.year} '
+        'às ${doisDigitos(data.hour)}:${doisDigitos(data.minute)}';
   }
 
   @override
@@ -90,6 +105,20 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
                 icon: const Icon(Icons.save),
                 label: const Text('Salvar Alterações'),
               ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.history, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  _ultimoAcesso == null
+                      ? 'Primeiro acesso neste dispositivo'
+                      : 'Último acesso: ${_formatarData(_ultimoAcesso!)}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
             ),
           ],
         ),
