@@ -19,6 +19,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
   bool _modoEscuro = false;
   bool _carregando = true;
   String? _ultimoAcesso;
+  List<Map<String, dynamic>> _historico = [];
 
   @override
   void initState() {
@@ -36,6 +37,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
     final nome = await _service.obterNomeUsuario();
     final modoEscuro = await _service.obterModoEscuro();
     final ultimoAcesso = await _service.obterUltimoAcesso();
+    final historico = await _service.obterHistorico();
 
     await _service.registrarAcesso();
 
@@ -45,6 +47,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
       _nomeController.text = nome;
       _modoEscuro = modoEscuro;
       _ultimoAcesso = ultimoAcesso;
+      _historico = historico;
       _carregando = false;
     });
   }
@@ -52,14 +55,19 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
   Future<void> _salvarPreferencias() async {
     await _service.salvarNomeUsuario(_nomeController.text);
     await _service.salvarModoEscuro(_modoEscuro);
+    await _service.adicionarAoHistorico(_nomeController.text, _modoEscuro);
+
+    final historico = await _service.obterHistorico();
 
     widget.onTemaAlterado(_modoEscuro);
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preferências salvas com sucesso!')),
-      );
-    }
+    if (!mounted) return;
+
+    setState(() => _historico = historico);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Preferências salvas com sucesso!')),
+    );
   }
 
   Future<void> _confirmarRedefinicao() async {
@@ -100,6 +108,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
       _nomeController.text = _nomePadrao;
       _modoEscuro = false;
       _ultimoAcesso = null;
+      _historico = [];
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -117,6 +126,46 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
         'às ${doisDigitos(data.hour)}:${doisDigitos(data.minute)}';
   }
 
+  Widget _secaoHistorico() {
+    if (_historico.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Nenhuma alteração registrada ainda.',
+            style: TextStyle(fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: _historico.length,
+      itemBuilder: (context, index) {
+        final registro = _historico[index];
+        final escuro = registro['modoEscuro'] == true;
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 6),
+          child: ListTile(
+            dense: true,
+            leading: Icon(escuro ? Icons.dark_mode : Icons.light_mode, size: 20),
+            title: Text(
+              registro['nome']?.toString() ?? '',
+              style: const TextStyle(fontSize: 14),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              _formatarData(registro['data']?.toString() ?? ''),
+              style: const TextStyle(fontSize: 11),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_carregando) {
@@ -128,6 +177,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(
               controller: _nomeController,
@@ -144,7 +194,20 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
               value: _modoEscuro,
               onChanged: (valor) => setState(() => _modoEscuro = valor),
             ),
-            const Spacer(),
+            const Divider(height: 24),
+            Row(
+              children: [
+                const Icon(Icons.list_alt, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  'Histórico de alterações (${_historico.length})',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Expanded(child: _secaoHistorico()),
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -162,7 +225,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
                 label: const Text('Redefinir Padrões'),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
