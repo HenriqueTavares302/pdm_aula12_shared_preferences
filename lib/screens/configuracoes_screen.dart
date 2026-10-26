@@ -14,6 +14,8 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
   final _service = PreferencesService();
   final _nomeController = TextEditingController();
 
+  static const String _nomePadrao = 'Usuário Convidado';
+
   bool _modoEscuro = false;
   bool _carregando = true;
   String? _ultimoAcesso;
@@ -60,6 +62,51 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
     }
   }
 
+  Future<void> _confirmarRedefinicao() async {
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Redefinir padrões'),
+        content: const Text(
+          'Todas as preferências salvas neste dispositivo serão apagadas. Deseja continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Redefinir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmou == true) {
+      await _redefinirPadroes();
+    }
+  }
+
+  Future<void> _redefinirPadroes() async {
+    await _service.limparTudo();
+    await _service.registrarAcesso();
+
+    widget.onTemaAlterado(false);
+
+    if (!mounted) return;
+
+    setState(() {
+      _nomeController.text = _nomePadrao;
+      _modoEscuro = false;
+      _ultimoAcesso = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Preferências redefinidas para o padrão')),
+    );
+  }
+
   String _formatarData(String bruto) {
     final data = DateTime.tryParse(bruto);
     if (data == null) return bruto;
@@ -104,6 +151,15 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
                 onPressed: _salvarPreferencias,
                 icon: const Icon(Icons.save),
                 label: const Text('Salvar Alterações'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _confirmarRedefinicao,
+                icon: const Icon(Icons.restore),
+                label: const Text('Redefinir Padrões'),
               ),
             ),
             const SizedBox(height: 16),
